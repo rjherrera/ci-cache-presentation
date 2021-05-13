@@ -14,6 +14,16 @@ jobs:
     steps:
       - checkout
 
+      - restore_cache:
+          keys:
+          - bundle-dependencies-{{ checksum "Gemfile.lock" }}
+          - bundle-dependencies-
+
+      - restore_cache:
+          keys:
+          - yarn-dependencies-{{ checksum "yarn.lock" }}
+          - yarn-dependencies-
+
       - run:
           name: Install bundle dependencies
           command: |
@@ -29,6 +39,16 @@ jobs:
             curl -o- -L https://yarnpkg.com/install.sh | bash
             sudo ln -s $HOME/.yarn/bin/yarn /usr/local/bin/yarn
             yarn install --frozen-lockfile
+
+      - save_cache:
+          key: bundle-dependencies-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+
+      - save_cache:
+          key: yarn-dependencies-{{ checksum "yarn.lock" }}
+          paths:
+            - node_modules
 
       - run:
           name: Wait for postgres
@@ -66,6 +86,16 @@ jobs:
     steps:
       - checkout
 
+      - restore_cache:
+          keys:
+          - bundle-dependencies-{{ checksum "Gemfile.lock" }}
+          - bundle-dependencies-
+
+      - restore_cache:
+          keys:
+          - yarn-dependencies-{{ checksum "yarn.lock" }}
+          - yarn-dependencies-
+
       - run:
           name: Install bundle dependencies
           command: |
@@ -81,6 +111,16 @@ jobs:
             curl -o- -sL https://yarnpkg.com/install.sh | bash
             sudo ln -s $HOME/.yarn/bin/yarn /usr/local/bin/yarn
             yarn install --frozen-lockfile
+
+      - save_cache:
+          key: bundle-dependencies-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+
+      - save_cache:
+          key: yarn-dependencies-{{ checksum "yarn.lock" }}
+          paths:
+            - node_modules
 
       - run:
           name: Install reviewdog
