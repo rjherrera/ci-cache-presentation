@@ -1,26 +1,60 @@
 version: 2
 jobs:
   test:
-    working_directory: ~/app
-
     docker:
-    - image: platanus/compose:1.22.0
+      - image: circleci/ruby:2.7
+        environment:
+          RAILS_ENV: test
+          BUNDLE_JOBS: 4
+          BUNDLE_RETRY: 3
+          BUNDLE_PATH: vendor/bundle
+      - image: postgres:11.3
+      - image: redis
 
     steps:
-    - checkout
-    - setup_remote_docker
+      - checkout
 
-    - run: docker info
-    - run: docker-compose -f docker-compose.ci.yml pull
-    - run: docker-compose -f docker-compose.ci.yml build test
-    - run: bin/cibuild services
-    - run: bin/cibuild deps
+      - run:
+          name: Install bundle dependencies
+          command: |
+            BUNDLER_VERSION=$(cat Gemfile.lock | tail -1 | tr -d " ")
+            gem install bundler:$BUNDLER_VERSION
+            bundle _$(echo $BUNDLER_VERSION)_ install
 
-    - run: bin/cibuild db
-    - run: bin/cibuild tests
+      - run:
+          name: Install yarn dependencies
+          command: |
+            curl -sL https://deb.nodesource.com/setup_$(cat .node-version).x | sudo -E bash -
+            sudo apt-get install -y nodejs
+            curl -o- -L https://yarnpkg.com/install.sh | bash
+            sudo ln -s $HOME/.yarn/bin/yarn /usr/local/bin/yarn
+            yarn install --frozen-lockfile
 
-    - run: bin/cibuild js_tests
+      - run:
+          name: Wait for postgres
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
 
+      - run:
+          name: Wait for redis
+          command: dockerize -wait tcp://localhost:6379 -timeout 1m
+
+      - run:
+          name: Setup database
+          command: bundle exec rails db:create db:schema:load
+
+      - run:
+          name: Run rspec
+          command: |
+            RSPEC_JUNIT_ARGS="-r rspec_junit_formatter -f RspecJunitFormatter -o test_results/rspec.xml"
+            RSPEC_FORMAT_ARGS="-f progress --no-color -p 10"
+            bundle exec rspec spec $RSPEC_FORMAT_ARGS $RSPEC_JUNIT_ARGS
+
+      - run:
+          name: Run jest
+          command: yarn run test
+
+      - store_test_results:
+          path: test_results
 
   lint:
     docker:
